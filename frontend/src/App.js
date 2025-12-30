@@ -1,15 +1,19 @@
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
+import MainPageLayout from "./layouts/MainPage";
 
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./features/auth/pages/LoginPage";
 import MainPage from "./features/user/pages/MainPage";
 import ProductListPage from "./features/products/pages/ProductListPage";
+import ProductSearchPage from "./features/products/pages/ProductSearchPage";
 import ProductDetailsPage from "./features/products/pages/ProductDetailsPage";
 import CartPage from "./features/cart/pages/CartPage";
+import CheckoutPage from "./features/orders/pages/CheckoutPage";
 import TrackShipping from "./features/orders/pages/TrackShipping";
 import OrderSuccessPage from "./features/orders/pages/OrderSuccessPage";
+import OrderHistory from "./features/orders/pages/OrderHistory";
 
 
 import AdminLayout from "./layouts/AdminLayout";
@@ -26,7 +30,12 @@ import AnalyticsPage from "./features/admin/analytics/pages/AnalyticsPage";
 const App = () => {
   return (
     <Routes>
-      <Route path="/" element={<MainLayout />} />
+      <Route path="/" element={<MainLayout />} >
+        <Route index element={<MainPageLayout />} />
+        <Route path="products" element={<ProductListPage />} />
+        <Route path="products/:productId" element={<ProductDetailsPage />} />
+        <Route path="search" element={<ProductSearchPage />} />
+      </Route>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute roles={["user"]} />}>
         <Route path="/user" element={<UserLayout />}>
@@ -35,10 +44,15 @@ const App = () => {
           <Route path="products" element={<ProductListPage />} />
           <Route path="products/:productId" element={<ProductDetailsPage />} />
           <Route path="cart" element={<CartPage />} />
-          <Route path="track-shipping" element={<TrackShipping />} />
+          <Route path="checkout" element={<CheckoutPage />} />
+          <Route path="order-success/:orderId" element={<OrderSuccessPage />} />
+          <Route path="track-shipping/:orderId" element={<TrackShipping />} />
           <Route path="order-success" element={<OrderSuccessPage />} />
+          <Route path="orders" element={<OrderHistory />} />
+          <Route path="search" element={<ProductSearchPage />} />
         </Route>
       </Route>
+
 
       <Route element={<ProtectedRoute roles={["admin"]} />}>
         <Route path="/admin" element={<AdminLayout />}>

@@ -3,7 +3,8 @@ import { IoSearch } from "react-icons/io5";
 import AddProduct from "./AddProduct";
 import EditProduct from "./EditProduct";
 import { fetchProducts, deleteProduct } from "../services/product.api";
-
+import { MdDelete } from "react-icons/md";
+import { FaRegEdit } from "react-icons/fa";
 const apiBase = (process.env.REACT_APP_API_URL || "http://localhost:5000/api")
   .replace(/\/$/, "")
   .replace(/\/api$/, "");
@@ -98,8 +99,10 @@ function AdminProducts() {
                   <th className="px-6 py-4">Product Name</th>
                   <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Price</th>
+                  <th className="px-6 py-4">Stock</th>
                   <th className="px-6 py-4">Offer</th>
                   <th className="px-6 py-4">Features</th>
+                  <th className="px-6 py-4">Search Keywords</th>
                   <th className="px-6 py-4">Images</th>
                   <th className="px-6 py-4">Actions</th>
                 </tr>
@@ -145,6 +148,17 @@ function AdminProducts() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                          (p.stock || 0) === 0 
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            : (p.stock || 0) < 10
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        }`}>
+                          {p.stock || 0} units
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
                         {p.offer ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             {p.offer}
@@ -159,6 +173,19 @@ function AdminProducts() {
                             {p.features.map((f, idx) => (
                               <span key={idx} className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs rounded">
                                 {f.name}: {f.value}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {p.searchKeywords && p.searchKeywords.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {p.searchKeywords.map((keyword, idx) => (
+                              <span key={idx} className="inline-block px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs rounded">
+                                {keyword}
                               </span>
                             ))}
                           </div>
@@ -193,13 +220,13 @@ function AdminProducts() {
                           onClick={() => handleEdit(p)}
                           className="text-blue-600 hover:underline"
                         >
-                          Edit
+                          <FaRegEdit />
                         </button>
                         <button
                           onClick={() => handleDelete(p._id, p.name)}
                           className="ml-4 text-red-600 hover:underline"
                         >
-                          Delete
+                          <MdDelete />
                         </button>
                       </td>
                     </tr>

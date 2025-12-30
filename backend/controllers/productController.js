@@ -2,7 +2,8 @@ const productService = require("../services/productService");
 
 exports.fetchProducts = async (req, res) => {
 	try {
-		const products = await productService.fetchProducts();
+		const { category, search } = req.query;
+		const products = await productService.fetchProducts({ category, search });
 		res.status(200).json(products);
 	} catch (error) {
 		res.status(400).json({ message: error.message });
@@ -22,12 +23,13 @@ exports.fetchProductById = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
 	try {
-		const { name, description, categories, price, offer, features, imageFeatures } = req.body;
+		const { name, description, categories, price, stock, offer, features, searchKeywords, imageFeatures } = req.body;
 		const files = req.files || [];
 
 		const parsedFeatures = typeof features === 'string' ? JSON.parse(features) : (features || []);
 		const parsedImageFeatures = typeof imageFeatures === 'string' ? JSON.parse(imageFeatures) : (imageFeatures || {});
 		const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : (categories || []);
+		const parsedSearchKeywords = typeof searchKeywords === 'string' ? JSON.parse(searchKeywords) : (searchKeywords || []);
 
 		const images = files.map((file, idx) => {
 			const relativePath = `/uploads/products/${file.filename}`;
@@ -48,8 +50,10 @@ exports.createProduct = async (req, res) => {
 			categories: parsedCategories,
 			images,
 			price: price ? parseFloat(price) : undefined,
+			stock: stock !== undefined ? parseInt(stock) : 0,
 			offer,
 			features: parsedFeatures,
+			searchKeywords: parsedSearchKeywords,
 		});
 
 		res.status(201).json(newProduct);
@@ -61,11 +65,12 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
 	try {
 		const { id } = req.params;
-		const { name, description, categories, price, offer, features, imageFeatures } = req.body;
+		const { name, description, categories, price, stock, offer, features, searchKeywords, imageFeatures } = req.body;
 		const files = req.files || [];
 
 		const parsedImageFeatures = typeof imageFeatures === 'string' ? JSON.parse(imageFeatures) : (imageFeatures || {});
 		const parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
+		const parsedSearchKeywords = typeof searchKeywords === 'string' ? JSON.parse(searchKeywords) : (searchKeywords || []);
 
 		const images = files.length
 			? files.map((file, idx) => {
@@ -90,8 +95,10 @@ exports.updateProduct = async (req, res) => {
 			categories: parsedCategories,
 			images,
 			price: price !== undefined ? parseFloat(price) : undefined,
+			stock: stock !== undefined ? parseInt(stock) : undefined,
 			offer,
 			features: parsedFeatures,
+			searchKeywords: parsedSearchKeywords,
 		});
 
 		res.status(200).json(updated);

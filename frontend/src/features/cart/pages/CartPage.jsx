@@ -1,231 +1,331 @@
-import React from 'react'
-
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getCart, updateCartQuantity, deleteCartItem } from '../services/cart.api';
+import { getUserOrders } from '../../orders/services/order.api';
+import Loader from '../../../components/ui/Loader';
+import ErrorMessage from '../../../components/feedback/ErrorMessage';
+import { IoIosArrowForward , IoIosArrowBack} from "react-icons/io";
+import { MdDelete } from "react-icons/md";
+import { FaMapMarkerAlt } from "react-icons/fa";
+import { MdOutlineSchedule } from "react-icons/md";
 function CartPage() {
+  const navigate = useNavigate();
+  const [cartItems, setCartItems] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [updatingItems, setUpdatingItems] = useState({});
+
+  const fetchCartItems = async () => {
+    try {
+      setLoading(true);
+      const [items, ordersData] = await Promise.all([
+        getCart(),
+        getUserOrders()
+      ]);
+      setCartItems(items);
+      // Filter non-completed orders
+      const activeOrders = ordersData.filter(order => {
+        const status = order.status?.toLowerCase() || '';
+        return !status.includes('deliver') && !status.includes('cancel');
+      });
+      setOrders(activeOrders);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to load cart');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCartItems();
+  }, []);
+
+  const handleUpdateQuantity = async (cartId, newQuantity) => {
+    if (newQuantity < 1) return;
+
+    try {
+      setUpdatingItems(prev => ({ ...prev, [cartId]: true }));
+      await updateCartQuantity(cartId, newQuantity);
+      await fetchCartItems();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update quantity');
+    } finally {
+      setUpdatingItems(prev => ({ ...prev, [cartId]: false }));
+    }
+  };
+
+  const handleDeleteItem = async (cartId) => {
+    try {
+      setUpdatingItems(prev => ({ ...prev, [cartId]: true }));
+      await deleteCartItem(cartId);
+      await fetchCartItems();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove item');
+    } finally {
+      setUpdatingItems(prev => ({ ...prev, [cartId]: false }));
+    }
+  };
+
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+  const shipping = subtotal > 0 ? 5.00 : 0;
+  const tax = subtotal * 0.085;
+  const orderTotal = subtotal + shipping + tax;
+
+  if (loading) return <Loader />;
+  if (error) return <ErrorMessage message={error} />;
+
   return (
-    <main class="flex flex-col min-h-screen py-8 md:py-12">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div class="mb-8">
-          <h1 class="text-3xl font-bold text-slate-900 dark:text-white">
+    <main className="flex flex-col min-h-screen py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
             Shopping Cart
           </h1>
-          <p class="mt-2 text-slate-500 dark:text-slate-400">
-            You have 3 items in your cart
+          <p className="mt-2 text-slate-500 dark:text-slate-400">
+            You have {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'} in your cart
           </p>
         </div>
-        <div class="flex flex-col lg:flex-row gap-8 lg:gap-12">
-          <div class="flex-1">
-            <div class="group relative flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 mb-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 transition-all hover:shadow-md">
-              <div class="w-full sm:w-28 h-28 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
-                <img
-                  alt="Urban Runner X1"
-                  class="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdNF8EDkMr9hFqIwiJyWFy2Ay7UvEHfqVFTVNONlVd-J3kd04zStwMf5Zl-bA6ObkeQzJSIth1w3wZzRfux4D-jx5Ttrfg4TVfGTV8cwMeJYBynmUfURHIoufyMxs7ev9038gTW227HaMSr6o_hQWutVQw3FvxbyteXrIYMHggx4Oq3NVeIu9pi24hCzyMreHTadApagbTrh_ZOp6I4KJJdZ_1D7lcjzrW5hspARbWmETo7gZte28O-qIOY7nn962icgG-5_BfaEg"
-                />
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+          <div className="flex-1">
+            {cartItems.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-slate-500 dark:text-slate-400 text-lg mb-4">Your cart is empty</p>
+                <a
+                  className="inline-flex items-center gap-2 text-primary font-semibold hover:text-blue-700 transition-colors"
+                  href="/user/main"
+                >
+                  <span className="material-symbols-outlined"><IoIosArrowBack /></span>
+                  Continue Shopping
+                </a>
               </div>
-              <div class="flex-1 w-full">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">
-                      Urban Runner X1
-                    </h3>
-                    <p class="text-sm text-slate-500 mt-1">
-                      Size: 42 • Color: Red
-                    </p>
+            ) : (
+              <>
+                {cartItems.map((item) => (
+                  <div key={item._id} className="group relative flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 mb-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 transition-all hover:shadow-md">
+                    <div className="w-full sm:w-28 h-28 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
+                      {item.productId?.images?.[0]?.url ? (
+                        <img
+                          src={item.productId.images[0].url}
+                          alt={item.productName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                          <span className="material-symbols-outlined text-4xl">shopping_bag</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 w-full">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                            {item.productName}
+                          </h3>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Quantity: {item.quantity}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteItem(item._id)}
+                          disabled={updatingItems[item._id]}
+                          className="text-red-500 hover:text-red-700 transition-colors p-1 disabled:opacity-50"
+                          title="Remove item"
+                        >
+                          <MdDelete />
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-end mt-4">
+                        <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg">
+                          <button 
+                            onClick={() => handleUpdateQuantity(item._id, item.quantity - 1)}
+                            disabled={item.quantity <= 1 || updatingItems[item._id]}
+                            className="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            -
+                          </button>
+                          <input
+                            className="w-10 text-center bg-transparent border-0 p-0 text-sm font-medium focus:ring-0"
+                            type="text"
+                            value={item.quantity}
+                            readOnly
+                          />
+                          <button 
+                            onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
+                            disabled={updatingItems[item._id]}
+                            className="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-slate-900 dark:text-white">
+                            ${item.totalPrice.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    class="text-slate-400 hover:text-red-500 transition-colors p-1"
-                    title="Remove item"
+                ))}
+                <div className="mt-8 flex justify-between items-center pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <a
+                    className="inline-flex items-center gap-2 text-primary font-semibold hover:text-blue-700 transition-colors"
+                    href="/"
                   >
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
+                    <span className="material-symbols-outlined"><IoIosArrowBack /></span>
+                    Continue Shopping
+                  </a>
                 </div>
-                <div class="flex justify-between items-end mt-4">
-                  <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg">
-                    <button class="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
-                      -
-                    </button>
-                    <input
-                      class="w-10 text-center bg-transparent border-0 p-0 text-sm font-medium focus:ring-0"
-                      type="text"
-                      value="1"
-                    />
-                    <button class="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
-                      +
-                    </button>
-                  </div>
-                  <div class="text-right">
-                    <p class="font-bold text-lg text-slate-900 dark:text-white">
-                      $120.00
-                    </p>
-                  </div>
+              </>
+            )}
+            
+            {orders.length > 0 && (
+              <div className="mt-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Active Orders
+                  </h2>
+                  <span className="text-sm text-slate-500">
+                    {orders.length} {orders.length === 1 ? 'order' : 'orders'} in progress
+                  </span>
                 </div>
-              </div>
-            </div>
-            <div class="group relative flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 mb-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 transition-all hover:shadow-md">
-              <div class="w-full sm:w-28 h-28 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
-                <img
-                  alt="Bass Pro Wireless"
-                  class="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQ7tHDcyzX8iyRaEWoSF2B0H1_XSLlpGgt7C_DHMW-r_dNW9so8z1g2jeyeoU7Z_Mk3jLoJQAPZVEXNPwH37ldI9-fX0-7EhLBYuXLwMSU8S_fazjY39m9RwkR5Z5eQOEOHCiQdKHyzCYqRTikXHk6aV-EwIm10Yc9w3C5eE_rJxKvrg26v4sk26CNKgS5OwXKs4_4OVfpBRsz1eMXGQaDVRk33L6ThObV_6JindU45qPO9IyNd1dinMEQOVlM-npdLRP53FSPfcY"
-                />
-              </div>
-              <div class="flex-1 w-full">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">
-                      Bass Pro Wireless
-                    </h3>
-                    <p class="text-sm text-slate-500 mt-1">
-                      Color: Midnight Black
-                    </p>
-                  </div>
-                  <button
-                    class="text-slate-400 hover:text-red-500 transition-colors p-1"
-                    title="Remove item"
-                  >
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                </div>
-                <div class="flex justify-between items-end mt-4">
-                  <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg">
-                    <button class="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
-                      -
-                    </button>
-                    <input
-                      class="w-10 text-center bg-transparent border-0 p-0 text-sm font-medium focus:ring-0"
-                      type="text"
-                      value="1"
-                    />
-                    <button class="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
-                      +
-                    </button>
-                  </div>
-                  <div class="text-right">
-                    <p class="font-bold text-lg text-slate-900 dark:text-white">
-                      $299.00
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="group relative flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 mb-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 transition-all hover:shadow-md">
-              <div class="w-full sm:w-28 h-28 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
-                <img
-                  alt="Explorer Backpack"
-                  class="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuATnWeJB1XCNok62qLtRKDiwJz06wfstIVhr2nGYxTOFYeqx5ClfLrdqYyxKUykAUwMQb0U1lAoPOfcloG-zcVaQXPzmhDqdgY1R0u7By1m_PX8SDkyECVmWWohqKHi8LunjCxaG6RPtMa_EfELL4NjdzN5QKV3nt4nbXClmTLYk-r-52b8MyUKoQWnRDgmP8s5RLAxSO36kYHqdXNIiE34vR3gdmgTWaYR7K8-_bTMZI0Sr72hyBbFAXzXAr4Oav9Q3MtR-uQin0g"
-                />
-              </div>
-              <div class="flex-1 w-full">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">
-                      Explorer Backpack
-                    </h3>
-                    <p class="text-sm text-slate-500 mt-1">
-                      Color: Olive Green
-                    </p>
-                  </div>
-                  <button
-                    class="text-slate-400 hover:text-red-500 transition-colors p-1"
-                    title="Remove item"
-                  >
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                </div>
-                <div class="flex justify-between items-end mt-4">
-                  <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg">
-                    <button class="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
-                      -
-                    </button>
-                    <input
-                      class="w-10 text-center bg-transparent border-0 p-0 text-sm font-medium focus:ring-0"
-                      type="text"
-                      value="1"
-                    />
-                    <button class="px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
-                      +
-                    </button>
-                  </div>
-                  <div class="text-right">
-                    <p class="font-bold text-lg text-slate-900 dark:text-white">
-                      $79.99
-                    </p>
-                  </div>
+                <div className="space-y-4">
+                  {orders.map((order) => (
+                    <div
+                      key={order._id}
+                      className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 p-6 transition-all hover:shadow-md"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Order ID</p>
+                          <h3 className="font-mono font-bold text-slate-900 dark:text-white">
+                            #{order.orderId}
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                            <span className="material-symbols-outlined text-sm"><MdOutlineSchedule /></span>
+                            {order.status || 'Processing'}
+                          </span>
+                          <button
+                            onClick={() => navigate(`/user/track-shipping/${order._id}`)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm"
+                          >
+                            <span className="material-symbols-outlined text-[18px]"><FaMapMarkerAlt /></span>
+                            Track Order
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-4 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                        <div className="flex-1">
+                          <p className="text-xs text-slate-500 mb-2">Items</p>
+                          <div className="flex -space-x-2">
+                            {order.items?.slice(0, 4).map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="h-10 w-10 rounded-lg border-2 border-white dark:border-slate-800 bg-slate-100 dark:bg-slate-700 overflow-hidden"
+                              >
+                                {item.productId?.images?.[0]?.url ? (
+                                  <img
+                                    src={item.productId.images[0].url}
+                                    alt={item.productName}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-slate-400 text-sm">shopping_bag</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {order.items?.length > 4 && (
+                              <div className="h-10 w-10 rounded-lg border-2 border-white dark:border-slate-800 bg-slate-200 dark:bg-slate-600 flex items-center justify-center">
+                                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                  +{order.items.length - 4}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500 mb-1">Order Total</p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            ${order.total?.toFixed(2) || '0.00'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
-            <div class="mt-8 flex justify-between items-center pt-6 border-t border-slate-200 dark:border-slate-700">
-              <a
-                class="inline-flex items-center gap-2 text-primary font-semibold hover:text-blue-700 transition-colors"
-                href="#"
-              >
-                <span class="material-symbols-outlined">arrow_back</span>
-                Continue Shopping
-              </a>
-            </div>
+            )}
           </div>
-          <div class="w-full lg:w-96 flex-shrink-0">
-            <div class="sticky top-24 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 p-6 lg:p-8">
-              <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-6">
+          <div className="w-full lg:w-96 flex-shrink-0">
+            <div className="sticky top-24 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 p-6 lg:p-8">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">
                 Order Summary
               </h2>
-              <div class="space-y-4 mb-6">
-                <div class="flex justify-between text-slate-600 dark:text-slate-400">
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Subtotal</span>
-                  <span class="font-medium text-slate-900 dark:text-white">
-                    $498.99
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    ${subtotal.toFixed(2)}
                   </span>
                 </div>
-                <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Shipping estimate</span>
-                  <span class="font-medium text-slate-900 dark:text-white">
-                    $5.00
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    ${shipping.toFixed(2)}
                   </span>
                 </div>
-                <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Tax estimate</span>
-                  <span class="font-medium text-slate-900 dark:text-white">
-                    $42.40
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    ${tax.toFixed(2)}
                   </span>
                 </div>
-                <div class="pt-4">
-                  <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <div className="pt-4">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Gift card or discount code
                   </label>
-                  <div class="flex gap-2">
+                  <div className="flex gap-2">
                     <input
-                      class="flex-1 rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-sm focus:ring-primary focus:border-primary"
+                      className="flex-1 rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-sm focus:ring-primary focus:border-primary"
                       placeholder="Enter code"
                       type="text"
                     />
-                    <button class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    <button className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
                       Apply
                     </button>
                   </div>
                 </div>
               </div>
-              <div class="border-t border-slate-200 dark:border-slate-700 pt-6 mb-8">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="text-lg font-bold text-slate-900 dark:text-white">
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-6 mb-8">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-lg font-bold text-slate-900 dark:text-white">
                     Order Total
                   </span>
-                  <span class="text-2xl font-bold text-slate-900 dark:text-white">
-                    $546.39
+                  <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                    ${orderTotal.toFixed(2)}
                   </span>
                 </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Taxes and shipping calculated at checkout
                 </p>
               </div>
-              <button class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2">
+              <button 
+                onClick={() => navigate('/user/checkout')}
+                disabled={cartItems.length === 0}
+                className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+              >
                 Proceed to Checkout
-                <span class="material-symbols-outlined text-[20px]">
-                  arrow_forward
+                <span className="material-symbols-outlined text-[20px]">
+                  <IoIosArrowForward />
                 </span>
               </button>
-              <div class="mt-6 flex items-center justify-center gap-2 text-xs text-slate-500">
-                <span class="material-symbols-outlined text-sm">lock</span>
+              <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-500">
+                <span className="material-symbols-outlined text-sm">lock</span>
                 Secure Checkout
               </div>
             </div>

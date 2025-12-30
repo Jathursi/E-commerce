@@ -6,14 +6,20 @@ export const useAuth = () => {
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
 
-  // Helper function to check if token is expired
+  // Helper function to check if token is expired (handle base64url)
   const isTokenExpired = (token) => {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiryTime = payload.exp * 1000; // Convert to milliseconds
+      const base64Url = token.split(".")[1];
+      if (!base64Url) return false;
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+      const payload = JSON.parse(atob(padded));
+      if (!payload?.exp) return false; // if no exp, assume not expired
+      const expiryTime = payload.exp * 1000; // Convert to ms
       return Date.now() >= expiryTime;
     } catch (e) {
-      return true; // If we can't parse, assume expired
+      // If parsing fails, do not aggressively log the user out
+      return false;
     }
   };
 

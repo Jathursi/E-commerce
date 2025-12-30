@@ -8,8 +8,16 @@ export const addProduct = (payload) => {
     const formData = new FormData();
     Object.entries(rest).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
+        // Always include searchKeywords even if empty
+        if (key === 'searchKeywords') {
+          formData.append(key, JSON.stringify(value || []));
+        }
+        // Skip other empty arrays
+        else if (Array.isArray(value) && value.length === 0) {
+          return;
+        }
         // Stringify arrays and objects for FormData
-        if (typeof value === 'object') {
+        else if (typeof value === 'object') {
           formData.append(key, JSON.stringify(value));
         } else {
           formData.append(key, value);
@@ -28,8 +36,16 @@ export const updateProduct = (id, payload) => {
     const formData = new FormData();
     Object.entries(rest).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
+        // Always include searchKeywords even if empty
+        if (key === 'searchKeywords') {
+          formData.append(key, JSON.stringify(value || []));
+        }
+        // Skip other empty arrays
+        else if (Array.isArray(value) && value.length === 0) {
+          return;
+        }
         // Stringify arrays and objects for FormData
-        if (typeof value === 'object') {
+        else if (typeof value === 'object') {
           formData.append(key, JSON.stringify(value));
         } else {
           formData.append(key, value);

@@ -8,15 +8,18 @@ import { FaUsers } from "react-icons/fa";
 import { SiSimpleanalytics } from "react-icons/si";
 import { CiSettings } from "react-icons/ci";
 import { IoMdHelp } from "react-icons/io";
-
-function Sidebar() {
+function Sidebar({ isOpen = false, onClose }) {
   const navLinkClass = ({ isActive }) =>
     isActive
       ? "flex items-center gap-3 px-3 py-2.5 bg-primary/10 text-primary rounded-lg font-medium"
       : "flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors font-medium";
   return (
-    <aside className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 hidden md:flex flex-col z-20">
-      <div className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-700">
+    <aside
+      className={`fixed inset-y-0 left-0 w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-transform duration-200 ease-in-out z-40 md:z-20
+      ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:flex md:flex-col`}
+      aria-label="Sidebar"
+    >
+      <div className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-700 justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
             <span className="material-symbols-outlined text-[20px]">
@@ -25,6 +28,14 @@ function Sidebar() {
           </div>
           <h1 className="font-bold text-lg tracking-tight">AdminPanel</h1>
         </div>
+        <button
+          type="button"
+          className="md:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+          onClick={onClose}
+          aria-label="Close sidebar"
+        >
+          <span className="material-symbols-outlined">X</span>
+        </button>
       </div>
       <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
         <NavLink

@@ -54,6 +54,76 @@ const productSchema = new mongoose.Schema(
         value: { type: String, trim: true },
       },
     ],
+    searchKeywords: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    reviews: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        userName: {
+          type: String,
+          required: true,
+        },
+        orderId: {
+          type: String,
+          required: true,
+        },
+        rating: {
+          type: Number,
+          required: true,
+          min: 1,
+          max: 5,
+        },
+        comment: {
+          type: String,
+          trim: true,
+        },
+        images: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
+        helpfulCount: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        helpfulBy: [
+          {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+        ],
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    averageRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    totalReviews: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

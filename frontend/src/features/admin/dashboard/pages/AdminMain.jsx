@@ -1,6 +1,67 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import http from '../../../../services/http.service'
 
 function AdminMain() {
+  const [analytics, setAnalytics] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    avgOrderValue: 0,
+    newCustomers: 0,
+    salesByCategory: [],
+    previousRevenue: 0,
+    previousOrders: 0,
+  })
+  const [recentOrders, setRecentOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [totalUsers, setTotalUsers] = useState(0)
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        const [analyticsData, ordersData, usersData] = await Promise.all([
+          http.get('/admin/analytics'),
+          http.get('/admin/orders?limit=4'),
+          http.get('/admin/user-details'),
+        ])
+        
+        console.log('Orders Data:', ordersData) // Debug log
+        console.log('Orders Data Keys:', Object.keys(ordersData || {})) // Debug log
+        console.log('Orders Array:', ordersData?.orders) // Debug log
+        
+        setAnalytics(analyticsData || {})
+        // Handle different response structures - check all possible keys
+        const orders = ordersData?.data?.orders || ordersData?.data || ordersData?.orders || (Array.isArray(ordersData) ? ordersData : [])
+        console.log('Setting orders:', orders) // Debug log
+        setRecentOrders(orders)
+        setTotalUsers(usersData?.length || 0)
+      } catch (err) {
+        console.error('Dashboard error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDashboardData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center justify-center h-96">
+          <div className="text-slate-500">Loading dashboard...</div>
+        </div>
+      </div>
+    )
+  }
+
+  const revenueChange = analytics.previousRevenue > 0 
+    ? (((parseFloat(analytics.totalRevenue) - parseFloat(analytics.previousRevenue)) / parseFloat(analytics.previousRevenue)) * 100).toFixed(1)
+    : 0
+
+  const ordersChange = analytics.previousOrders > 0
+    ? (((analytics.totalOrders - analytics.previousOrders) / analytics.previousOrders) * 100).toFixed(1)
+    : 0
+
   return (
       
         
@@ -13,11 +74,11 @@ function AdminMain() {
                     attach_money
                   </span>
                 </div>
-                <span className="flex items-center gap-1 text-sm font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
+                <span className={`flex items-center gap-1 text-sm font-medium ${revenueChange >= 0 ? 'text-green-600 bg-green-50 dark:bg-green-900/20' : 'text-red-600 bg-red-50 dark:bg-red-900/20'} px-2 py-1 rounded-full`}>
                   <span className="material-symbols-outlined text-base">
-                    trending_up
+                    {revenueChange >= 0 ? 'trending_up' : 'trending_down'}
                   </span>{" "}
-                  +12.5%
+                  {revenueChange >= 0 ? '+' : ''}{revenueChange}%
                 </span>
               </div>
               <div>
@@ -25,7 +86,7 @@ function AdminMain() {
                   Total Revenue
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                  $45,231.89
+                  ${parseFloat(analytics.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </h3>
               </div>
             </div>
@@ -36,11 +97,11 @@ function AdminMain() {
                     shopping_cart
                   </span>
                 </div>
-                <span className="flex items-center gap-1 text-sm font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
+                <span className={`flex items-center gap-1 text-sm font-medium ${ordersChange >= 0 ? 'text-green-600 bg-green-50 dark:bg-green-900/20' : 'text-red-600 bg-red-50 dark:bg-red-900/20'} px-2 py-1 rounded-full`}>
                   <span className="material-symbols-outlined text-base">
-                    trending_up
+                    {ordersChange >= 0 ? 'trending_up' : 'trending_down'}
                   </span>{" "}
-                  +8.2%
+                  {ordersChange >= 0 ? '+' : ''}{ordersChange}%
                 </span>
               </div>
               <div>
@@ -48,7 +109,7 @@ function AdminMain() {
                   Total Orders
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                  1,205
+                  {analytics.totalOrders?.toLocaleString() || 0}
                 </h3>
               </div>
             </div>
@@ -57,19 +118,19 @@ function AdminMain() {
                 <div className="w-12 h-12 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center">
                   <span className="material-symbols-outlined">group</span>
                 </div>
-                <span className="flex items-center gap-1 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-full">
+                <span className="flex items-center gap-1 text-sm font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
                   <span className="material-symbols-outlined text-base">
-                    trending_down
+                    trending_up
                   </span>{" "}
-                  -2.4%
+                  +{((analytics.newCustomers / (totalUsers || 1)) * 100).toFixed(1)}%
                 </span>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  Active Users
+                  Total Users
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                  8,921
+                  {totalUsers?.toLocaleString() || 0}
                 </h3>
               </div>
             </div>
@@ -82,15 +143,15 @@ function AdminMain() {
                   <span className="material-symbols-outlined text-base">
                     trending_up
                   </span>{" "}
-                  +4.6%
+                  +{analytics.previousAvgValue > 0 ? (((parseFloat(analytics.avgOrderValue) - parseFloat(analytics.previousAvgValue)) / parseFloat(analytics.previousAvgValue)) * 100).toFixed(1) : 0}%
                 </span>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  Total Sales
+                  Avg Order Value
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                  2,340
+                  ${parseFloat(analytics.avgOrderValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </h3>
               </div>
             </div>
@@ -167,53 +228,40 @@ function AdminMain() {
                 Orders by Category
               </h3>
               <div className="flex-1 flex items-end justify-between gap-2 h-64">
-                <div className="w-full flex flex-col items-center gap-2 group cursor-pointer">
-                  <div className="relative w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-32 overflow-hidden group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
-                    <div className="absolute bottom-0 w-full bg-blue-500 h-[65%] rounded-t-lg"></div>
+                {analytics.salesByCategory && analytics.salesByCategory.length > 0 ? (
+                  analytics.salesByCategory.slice(0, 5).map((category, index) => {
+                    const colors = ['bg-blue-500', 'bg-purple-500', 'bg-orange-500', 'bg-emerald-500', 'bg-pink-500'];
+                    const maxSales = Math.max(...analytics.salesByCategory.map(c => c.totalSold || 0), 1);
+                    const heightPercentage = ((category.totalSold || 0) / maxSales) * 100;
+                    const categoryName = (category._id || 'Unknown').substring(0, 4);
+
+                    return (
+                      <div key={category._id || index} className="w-full flex flex-col items-center gap-2 group cursor-pointer">
+                        <div className="relative w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-40 overflow-hidden group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
+                          <div 
+                            className={`absolute bottom-0 w-full ${colors[index % colors.length]} rounded-t-lg`}
+                            style={{ height: `${heightPercentage}%` }}
+                            title={`${category._id}: ${category.totalSold} units`}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-slate-500 font-medium">
+                          {categoryName}
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="w-full flex items-center justify-center h-40">
+                    <p className="text-slate-500">No category data</p>
                   </div>
-                  <span className="text-xs text-slate-500 font-medium">
-                    Elec
-                  </span>
-                </div>
-                <div className="w-full flex flex-col items-center gap-2 group cursor-pointer">
-                  <div className="relative w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-40 overflow-hidden group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
-                    <div className="absolute bottom-0 w-full bg-purple-500 h-[80%] rounded-t-lg"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 font-medium">
-                    Fash
-                  </span>
-                </div>
-                <div className="w-full flex flex-col items-center gap-2 group cursor-pointer">
-                  <div className="relative w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-24 overflow-hidden group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
-                    <div className="absolute bottom-0 w-full bg-orange-500 h-[45%] rounded-t-lg"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 font-medium">
-                    Home
-                  </span>
-                </div>
-                <div className="w-full flex flex-col items-center gap-2 group cursor-pointer">
-                  <div className="relative w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-28 overflow-hidden group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
-                    <div className="absolute bottom-0 w-full bg-emerald-500 h-[55%] rounded-t-lg"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 font-medium">
-                    Beau
-                  </span>
-                </div>
-                <div className="w-full flex flex-col items-center gap-2 group cursor-pointer">
-                  <div className="relative w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-20 overflow-hidden group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
-                    <div className="absolute bottom-0 w-full bg-pink-500 h-[40%] rounded-t-lg"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 font-medium">
-                    Acc
-                  </span>
-                </div>
+                )}
               </div>
             </div>
           </div>
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Recent Orders
+                Recent Orders (Debug: {recentOrders.length} orders loaded)
               </h3>
               <a
                 className="text-sm font-medium text-primary hover:text-blue-700"
@@ -236,139 +284,68 @@ function AdminMain() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                      #ORD-5532
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          alt="User"
-                          className="w-8 h-8 rounded-full object-cover"
-                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBf9I8_tyUbviAorXatCl07Xeu5LpOAgYthbm8y73PlWJsnHjEu-f-Zwu8pfTokHUCgyITKbgFZqEXAlB7r-I0Pl5_iwItg7DeZgtsYH0210miuqTqC2UkwgLOOI2KfpKGukSAkJ35ydSpnDmxOMNOVvCBoahWePsBJL47Wej8kycewXxUohO5tu8lGAVZmESvp6WGYe6-yl4CFFaHCmTj9HOyi6HkANYpNGOl5Z1xA-rdnHiSIOZdnfhcZPJHyPOV6k5A3KZ08mVc"
-                        />
-                        <span>Sarah Johnson</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">Urban Runner X1</td>
-                    <td className="px-6 py-4">Oct 24, 2024</td>
-                    <td className="px-6 py-4 font-medium">$120.00</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        Completed
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">
-                          more_vert
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                      #ORD-5531
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          alt="User"
-                          className="w-8 h-8 rounded-full object-cover"
-                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAgWt6YId3ySAvK6GqDx8pH4_qGOyBY33IdgKu8J7qEMXVMZRHzE0GBRZqw_7_WdD7VWiCApZaET6dVrL8k__YJ5uMGBaYI1oOg0y9Z9pqiLbuqVOfA9Un3yaVn-mPNRZHPxlWZrfoqS8mFQDRfFqB7TfdneboNRpAaT_5Ygve-_iHW5H7FqT-5_kuqe1FN6qaerkJTY0njyr-LiYeuiuT2AyhzFdM3QGJ0oqjX2ymAA6u88dbgBvp_lKpsD2qvOZiMXyDMiv6EKYY"
-                        />
-                        <span>Michael Chen</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">Bass Pro Wireless</td>
-                    <td className="px-6 py-4">Oct 24, 2024</td>
-                    <td className="px-6 py-4 font-medium">$299.00</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        Processing
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">
-                          more_vert
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                      #ORD-5530
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          alt="User"
-                          className="w-8 h-8 rounded-full object-cover"
-                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDH_dLFqnkTn7Cok0X5B3Jq-KAa-wgZxOhi9gCtCW6Y_WnhOY6oPpW4sN2fjokwltUGi_CdelOciFDaBkgS-yxHPUjqpgtQ6jUK-48UNVMJn0C5gdKYMyYJ9ZFL8v9ulBfrx9mrSUz9RD9rqT7xnAQRotgTj-cbd32RLex0NQX4VGVAo8Qc6wgniKoS301TMmnqxkrM5onASwh6vD03SdPE-qM_H_O1en6aQkEXpPtaCLT-sbmUCdh924Th6fhYZdwXbE7x4aJHxxI"
-                        />
-                        <span>Emily Davis</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">Retro Instant Cam</td>
-                    <td className="px-6 py-4">Oct 23, 2024</td>
-                    <td className="px-6 py-4 font-medium">$89.99</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        Pending
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">
-                          more_vert
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                      #ORD-5529
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          alt="User"
-                          className="w-8 h-8 rounded-full object-cover"
-                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDWWkEOJ3XAZFQNlfR4OenqWDRUU2eGN-V0z75dXooBzqUMh9UdUDftMNapoBvZ7QAL8f1xXiXp8TSMA3DyV_DdEMHBYxQJls_P8gdx1luSzx9p3Wb2-9HDTOjCz8t2xuSMSMvTRzXFN1F23uJghFWUaJL5164uriZHS2OGlXbZNiNmKkpplgas1XuszFf4hdeLamFjNeiw-swmkBmzGrtH2iVknBTa6K5t6JVZOuHyW8Yb7LczypVPXNxdxOrHu9SWtvVli9ruvf0"
-                        />
-                        <span>David Wilson</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">Minimalist Silver Watch</td>
-                    <td className="px-6 py-4">Oct 23, 2024</td>
-                    <td className="px-6 py-4 font-medium">$145.00</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        Cancelled
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">
-                          more_vert
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
+                  {recentOrders && recentOrders.length > 0 ? (
+                    recentOrders.map((order) => {
+                      const statusColors = {
+                        delivered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                        processing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                        shipped: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+                        pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                        cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                      };
+
+                      const firstProduct = order.items && order.items[0] ? order.items[0].productId : null;
+                      const productName = firstProduct?.name || 'Unknown Product';
+                      const productImage = firstProduct?.images?.[0]?.url || firstProduct?.imageUrl;
+
+                      return (
+                        <tr key={order._id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                          <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                            #{order.orderId || order._id?.substring(0, 8)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center font-semibold text-primary">
+                                {order.userId?.name?.charAt(0)?.toUpperCase() || 'U'}
+                              </div>
+                              <span>{order.userId?.name || 'Unknown User'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">{productName}{order.items?.length > 1 ? ` +${order.items.length - 1} more` : ''}</td>
+                          <td className="px-6 py-4">{new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                          <td className="px-6 py-4 font-medium">${parseFloat(order.total || 0).toFixed(2)}</td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || statusColors.pending}`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                              {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Pending'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button className="text-slate-400 hover:text-primary transition-colors">
+                              <span className="material-symbols-outlined text-[18px]">
+                                more_vert
+                              </span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-8 text-center text-slate-500">
+                        No recent orders found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
             <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-sm text-slate-500">
-              <p>Showing 1-4 of 120 orders</p>
+              <p>Showing {recentOrders.length > 0 ? '1' : '0'}-{recentOrders.length} of {analytics.totalOrders || 0} orders</p>
               <div className="flex gap-2">
                 <button
                   className="px-3 py-1 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
-                  disabled=""
+                  disabled
                 >
                   Prev
                 </button>

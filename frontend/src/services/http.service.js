@@ -24,6 +24,7 @@ const http = {
   get: (url, params) => api.get(url, { params }).then((res) => res.data),
   post: (url, data, config = {}) => api.post(url, data, config).then((res) => res.data),
   put: (url, data) => api.put(url, data).then((res) => res.data),
+  patch: (url, data) => api.patch(url, data).then((res) => res.data),
   delete: (url) => api.delete(url).then((res) => res.data),
   postForm: (url, data) =>
     api

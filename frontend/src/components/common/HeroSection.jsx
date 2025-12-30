@@ -1,9 +1,20 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import LoginSignupModal from './LoginSignupModal'
 import { FaArrowRight } from "react-icons/fa";
 import { FaPercent } from "react-icons/fa";
 
 function HeroSection() {
+  const navigate = useNavigate()
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+
+  const handleShopNow = () => {
+    const token = localStorage.getItem('token')
+    navigate(token ? '/user/products' : '/products')
+  }
+
   return (
+    <>
     <section className="relative w-full py-8 md:py-12 lg:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="@container">
         <div className="flex flex-col-reverse lg:flex-row items-center gap-8 lg:gap-16">
@@ -27,7 +38,10 @@ function HeroSection() {
               today.
             </p>
             <div className="flex flex-wrap gap-4 pt-2">
-              <button className="bg-primary hover:bg-blue-600 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center gap-2">
+              <button 
+                onClick={handleShopNow}
+                className="bg-primary hover:bg-blue-600 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center gap-2"
+              >
                 Shop Now
                 <span className="material-symbols-outlined text-[20px]">
                   <FaArrowRight />
@@ -92,6 +106,18 @@ function HeroSection() {
         </div>
       </div>
     </section>
+
+    <LoginSignupModal 
+      isOpen={isLoginModalOpen}
+      onClose={() => setIsLoginModalOpen(false)}
+      onLoginSuccess={(shouldRedirect) => {
+        setIsLoginModalOpen(false)
+        if (shouldRedirect) {
+          navigate('/user/products')
+        }
+      }}
+    />
+    </>
   );
 }
 

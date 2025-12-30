@@ -1,19 +1,31 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "../features/auth/hooks/useAuth";
+
+const isTokenExpired = (token) => {
+  try {
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return false;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const payload = JSON.parse(atob(padded));
+    if (!payload?.exp) return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return false;
+  }
+};
 
 const ProtectedRoute = ({ roles }) => {
-  const { user, loading } = useAuth();
+  const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
 
-  // show nothing or spinner while checking auth
-  if (loading) return <div>Loading...</div>;
+  if (!token || !role || isTokenExpired(token)) {
+    return <Navigate to="/login" />;
+  }
 
-  // if no user, redirect to login
-  if (!user) return <Navigate to="/login" />;
+  if (roles && !roles.includes(role)) {
+    return <Navigate to="/login" />;
+  }
 
-  // if user role doesn't match, redirect
-  if (roles && !roles.includes(user.role)) return <Navigate to="/login" />;
-
-  // authorized
   return <Outlet />;
 };
 

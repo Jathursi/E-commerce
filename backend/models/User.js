@@ -24,6 +24,32 @@ const userSchema = new mongoose.Schema(
       enum: ["user", "admin"],
       default: "user",
     },
+    addresses: [
+      {
+        firstName: { type: String, required: true },
+        lastName: { type: String, required: true },
+        email: { type: String, required: true },
+        phone: { type: String, required: true },
+        address: { type: String, required: true },
+        city: { type: String, required: true },
+        state: { type: String, required: true },
+        zipCode: { type: String, required: true },
+        isDefault: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    paymentMethods: [
+      {
+        type: { type: String, enum: ["card", "netbanking"], required: true },
+        displayName: { type: String, default: "" },
+        brand: { type: String },
+        last4: { type: String },
+        accountLast4: { type: String },
+        ifsc: { type: String },
+        isDefault: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

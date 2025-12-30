@@ -8,8 +8,10 @@ function EditProduct({ product, onClose, onSuccess }) {
     description: "",
     categories: [],
     price: "",
+    stock: "",
     offer: "",
     features: [],
+    searchKeywords: [],
     files: [],
   });
   const [previews, setPreviews] = useState([]);
@@ -44,8 +46,10 @@ function EditProduct({ product, onClose, onSuccess }) {
         description: product.description || "",
         categories: product.categories?.map((c) => c._id || c) || [],
         price: product.price || "",
+        stock: product.stock || "",
         offer: product.offer || "",
         features: product.features || [],
+        searchKeywords: product.searchKeywords || [],
         files: [],
       });
       setExistingImages(product.images || []);
@@ -77,30 +81,39 @@ function EditProduct({ product, onClose, onSuccess }) {
     const img = e.currentTarget.querySelector('img');
     if (!img) return;
     
-    const rect = img.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    try {
+      const rect = img.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-    // Create canvas to get pixel color
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    
-    // Set canvas size to match displayed image
-    canvas.width = img.width;
-    canvas.height = img.height;
-    
-    // Draw the current img element directly
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    
-    // Get pixel at click position
-    const pixelData = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
-    const hex = `#${[pixelData[0], pixelData[1], pixelData[2]].map(x => x.toString(16).padStart(2, '0')).join('')}`;
-    
-    const setFeatures = isNew ? setImageFeatures : setExistingImageFeatures;
-    setFeatures((prev) => ({
-      ...prev,
-      [idx]: { ...prev[idx], colorHex: hex, featureValue: hex },
-    }));
+      // Create canvas to get pixel color
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      // Set canvas size to match displayed image
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw the current img element directly
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      // Get pixel at click position
+      const pixelData = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+      const hex = `#${[pixelData[0], pixelData[1], pixelData[2]].map(x => x.toString(16).padStart(2, '0')).join('')}`;
+      
+      const setFeatures = isNew ? setImageFeatures : setExistingImageFeatures;
+      setFeatures((prev) => ({
+        ...prev,
+        [idx]: { ...prev[idx], colorHex: hex, featureValue: hex },
+      }));
+    } catch (err) {
+      if (err.name === 'SecurityError') {
+        setError('Cannot pick color from external images. Please use images uploaded locally or enable CORS on the server.');
+      } else {
+        setError('Error picking color. Please try again.');
+      }
+      console.error('Color picker error:', err);
+    }
   };
 
   const handleMouseMove = (e) => {
@@ -161,6 +174,10 @@ function EditProduct({ product, onClose, onSuccess }) {
       setError("Please enter a valid price");
       return;
     }
+    if (!formData.searchKeywords || formData.searchKeywords.length === 0) {
+      setError("Please add at least one search keyword");
+      return;
+    }
 
     setIsSubmitting(true);
     setError("");
@@ -171,8 +188,10 @@ function EditProduct({ product, onClose, onSuccess }) {
         description: formData.description,
         categories: formData.categories,
         price: formData.price,
+        stock: formData.stock,
         offer: formData.offer,
         features: formData.features,
+        searchKeywords: formData.searchKeywords,
         files: formData.files,
         imageFeatures: { ...existingImageFeatures, ...imageFeatures },
       };
@@ -266,7 +285,7 @@ function EditProduct({ product, onClose, onSuccess }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Price *
@@ -280,6 +299,21 @@ function EditProduct({ product, onClose, onSuccess }) {
                 min="0"
                 className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Stock *
+              </label>
+              <input
+                type="number"
+                name="stock"
+                value={formData.stock}
+                onChange={handleChange}
+                min="0"
+                className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0"
                 required
               />
             </div>
@@ -353,6 +387,72 @@ function EditProduct({ product, onClose, onSuccess }) {
               </button>
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Search Keywords *
+            </label>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  id="search-keyword-input"
+                  placeholder="Enter a search keyword"
+                  className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && e.target.value.trim()) {
+                      e.preventDefault();
+                      const newKeyword = e.target.value.trim().toLowerCase();
+                      if (!formData.searchKeywords.includes(newKeyword)) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          searchKeywords: [...prev.searchKeywords, newKeyword],
+                        }));
+                        e.target.value = '';
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.getElementById('search-keyword-input');
+                    const newKeyword = input.value.trim().toLowerCase();
+                    if (newKeyword && !formData.searchKeywords.includes(newKeyword)) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        searchKeywords: [...prev.searchKeywords, newKeyword],
+                      }));
+                      input.value = '';
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              {formData.searchKeywords.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {formData.searchKeywords.map((keyword, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-sm rounded-full">
+                      {keyword}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            searchKeywords: prev.searchKeywords.filter((_, i) => i !== idx),
+                          }));
+                        }}
+                        className="ml-1 hover:font-bold"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -398,6 +498,7 @@ function EditProduct({ product, onClose, onSuccess }) {
                             <img
                               src={img.url}
                               alt={`Existing ${idx + 1}`}
+                              crossOrigin="anonymous"
                               className="w-full h-full object-contain pointer-events-none select-none"
                               onMouseDown={(e) => handleImageMouseDown(e, idx, false)}
                               style={{
@@ -506,6 +607,7 @@ function EditProduct({ product, onClose, onSuccess }) {
                             <img
                               src={src}
                               alt={`Preview ${idx + 1}`}
+                              crossOrigin="anonymous"
                               className="w-full h-full object-contain pointer-events-none select-none"
                               onMouseDown={(e) => handleImageMouseDown(e, idx, true)}
                               style={{

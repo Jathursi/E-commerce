@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchCategories } from '../../features/admin/category/services/category.api'
 import { IoIosArrowForward } from "react-icons/io";
+
 const apiBase = (process.env.REACT_APP_API_URL || "http://localhost:5000/api")
   .replace(/\/$/, "")
   .replace(/\/api$/, "");
 
 function CategoryCard() {
+  const navigate = useNavigate()
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -46,6 +49,12 @@ function CategoryCard() {
         <a
           className="text-primary font-semibold hover:text-blue-700 flex items-center gap-1 transition-colors"
           href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            const token = localStorage.getItem('token');
+            const base = token ? '/user' : '';
+            navigate(`${base}/products`);
+          }}
         >
           View All{" "}
           <span className="material-symbols-outlined text-lg">
@@ -62,10 +71,14 @@ function CategoryCard() {
             : null;
 
           return (
-            <a
+            <div
               key={cat._id}
-              className="group relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md transition-all hover:shadow-xl"
-              href="#"
+              className="group relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md transition-all hover:shadow-xl cursor-pointer"
+              onClick={() => {
+                const token = localStorage.getItem('token')
+                const base = token ? '/user' : ''
+                navigate(`${base}/products?category=${encodeURIComponent(cat.name)}`)
+              }}
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10 opacity-60 group-hover:opacity-70 transition-opacity"></div>
               {imageUrl ? (
@@ -89,7 +102,7 @@ function CategoryCard() {
                   {cat.productCount || "0"} Products
                 </span>
               </div>
-            </a>
+            </div>
           );
         })}
       </div>

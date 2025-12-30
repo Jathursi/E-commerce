@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import http from '../../../services/http.service';
 import Loader from '../../../components/ui/Loader';
 import ErrorMessage from '../../../components/feedback/ErrorMessage';
 import Pagination from '../../../components/common/Pagination';
+import { addToCart } from '../../cart/services/cart.api';
+import LoginSignupModal from '../../../components/common/LoginSignupModal';
+import { IoIosArrowForward } from "react-icons/io";
+import { FaStar } from "react-icons/fa";
+import { FaShoppingCart } from "react-icons/fa";
 
 function ProductListPage() {
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -24,6 +30,15 @@ function ProductListPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(9);
   const navigate = useNavigate();
+
+  // Modal states for add to cart
+  const [isQuantityModalOpen, setIsQuantityModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [modalAction, setModalAction] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [modalQuantity, setModalQuantity] = useState(1);
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,6 +73,20 @@ function ProductListPage() {
 
     fetchData();
   }, []);
+
+  // Apply category filter from URL on mount
+  useEffect(() => {
+    const categoryFromUrl = searchParams.get('category');
+    if (categoryFromUrl && categories.length > 0) {
+      // Check if this category exists in our categories list
+      const matchingCategory = categories.find(
+        cat => cat.name.toLowerCase() === categoryFromUrl.toLowerCase()
+      );
+      if (matchingCategory && !selectedCategories.includes(matchingCategory.name)) {
+        setSelectedCategories([matchingCategory.name]);
+      }
+    }
+  }, [searchParams, categories]);
 
   // Apply filters whenever filter state changes
   useEffect(() => {
@@ -157,9 +186,76 @@ function ProductListPage() {
     setInStockOnly(false);
   };
 
+  const ensureLoggedIn = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setIsLoginModalOpen(true);
+      return false;
+    }
+    return true;
+  };
+
+  const openQuantityModal = (product, action) => {
+    if ((product?.stock ?? 0) <= 0) {
+      setActionError('Out of stock');
+      return;
+    }
+    if (!ensureLoggedIn()) return;
+    setSelectedProduct(product);
+    setModalAction(action);
+    setModalQuantity(1);
+    setActionError('');
+    setActionMessage('');
+    setIsQuantityModalOpen(true);
+  };
+
+  const closeQuantityModal = () => {
+    setIsQuantityModalOpen(false);
+    setSelectedProduct(null);
+    setModalAction('');
+    setModalQuantity(1);
+  };
+
+  const handleConfirmQuantity = async () => {
+    if (!selectedProduct) return;
+    if (modalQuantity < 1) {
+      setActionError('Quantity must be at least 1');
+      return;
+    }
+
+    if (modalAction === 'cart') {
+      try {
+        await addToCart({ productId: selectedProduct._id, quantity: modalQuantity });
+        setActionMessage('Product added to cart');
+        closeQuantityModal();
+      } catch (err) {
+        const msg = err?.response?.data?.message || err.message || 'Failed to add to cart';
+        setActionError(msg);
+      }
+      return;
+    }
+
+    if (modalAction === 'buyNow') {
+      navigate('/user/checkout', {
+        state: {
+          buyNowItem: {
+            productId: selectedProduct._id,
+            productName: selectedProduct.name,
+            price: Number(selectedProduct.price) || 0,
+            quantity: modalQuantity,
+            image: selectedProduct.images?.[0]?.url || '',
+          },
+        },
+      });
+      closeQuantityModal();
+    }
+  };
+
   const handleProductClick = (productId) => {
     if (!productId) return;
-    navigate(`/user/products/${productId}`);
+    const token = localStorage.getItem('token');
+    const base = token ? '/user' : '';
+    navigate(`${base}/products/${productId}`);
   };
 
   const handleProductKeyDown = (event, productId) => {
@@ -190,7 +286,7 @@ function ProductListPage() {
           <li>
             <div className="flex items-center">
               <span className="material-symbols-outlined text-slate-400 mx-1">
-                chevron_right
+                <IoIosArrowForward />
               </span>
               <a
                 className="hover:text-primary dark:hover:text-white transition-colors"
@@ -203,7 +299,7 @@ function ProductListPage() {
           <li aria-current="page">
             <div className="flex items-center">
               <span className="material-symbols-outlined text-slate-400 mx-1">
-                chevron_right
+                <IoIosArrowForward />
               </span>
               <span className="text-slate-900 dark:text-white font-medium">
                 All Products
@@ -478,79 +574,96 @@ function ProductListPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {products.length > 0 ? (
-              products.map((product) => (
-                <div
-                  key={product._id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleProductClick(product._id)}
-                  onKeyDown={(e) => handleProductKeyDown(e, product._id)}
-                  className="group flex flex-col bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300 border border-slate-100 dark:border-slate-700/50 cursor-pointer"
-                >
-                  <div className="relative aspect-[4/5] sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
-                    {product.offer && (
-                      <span className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider z-10">
-                        {product.offer}% Off
-                      </span>
-                    )}
-                    <img
-                      alt={product.name}
-                      className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      src={
-                        product.images?.[0]?.url ||
-                        "https://via.placeholder.com/400"
-                      }
-                    />
-                    <button
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute bottom-3 right-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-2.5 rounded-full shadow-lg opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-primary hover:text-white"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        add_shopping_cart
-                      </span>
-                    </button>
-                  </div>
-                  <div className="p-4 flex flex-col flex-1">
-                    <p className="text-xs text-slate-500 mb-1">
-                      {product.categories?.[0]?.name || "Uncategorized"}
-                    </p>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary transition-colors cursor-pointer">
-                      {product.name}
-                    </h3>
-                    <div className="flex items-center gap-1 mb-3">
-                      {[...Array(5)].map((_, i) => (
-                        <span
-                          key={i}
-                          className={`material-symbols-outlined text-[16px] ${
-                            i < 4
-                              ? "text-yellow-400 fill-current"
-                              : "text-slate-300"
-                          }`}
-                        >
-                          star
+              products.map((product) => {
+                const outOfStock = (product.stock ?? 0) <= 0
+                return (
+                  <div
+                    key={product._id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleProductClick(product._id)}
+                    onKeyDown={(e) => handleProductKeyDown(e, product._id)}
+                    className="group flex flex-col bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300 border border-slate-100 dark:border-slate-700/50 cursor-pointer"
+                  >
+                    <div className="relative aspect-[4/5] sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
+                      {product.offer && (
+                        <span className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider z-10">
+                          {product.offer}% Off
                         </span>
-                      ))}
-                      <span className="text-xs text-slate-400 ml-1">(0)</span>
+                      )}
+                      {outOfStock && (
+                        <span className="absolute top-3 right-3 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider z-10">
+                          Out of Stock
+                        </span>
+                      )}
+                      <img
+                        alt={product.name}
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                        src={
+                          product.images?.[0]?.url ||
+                          "https://via.placeholder.com/400"
+                        }
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (outOfStock) return;
+                          openQuantityModal(product, 'cart');
+                        }}
+                        disabled={outOfStock}
+                        className={`absolute bottom-3 right-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-2.5 rounded-full shadow-lg opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-primary hover:text-white ${outOfStock ? 'cursor-not-allowed opacity-70' : ''}`}
+                        title={outOfStock ? 'Out of Stock' : 'Add to cart'}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          <FaShoppingCart />
+                        </span>
+                      </button>
                     </div>
-                    <div className="mt-auto flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg text-primary">
-                          ${product.price?.toFixed(2) || "0.00"}
-                        </span>
-                        {product.offer && (
-                          <span className="text-sm text-slate-400 line-through">
-                            $
-                            {(
-                              product.price /
-                              (1 - product.offer / 100)
-                            ).toFixed(2)}
+                    <div className="p-4 flex flex-col flex-1">
+                      <p className="text-xs text-slate-500 mb-1">
+                        {product.categories?.[0]?.name || "Uncategorized"}
+                      </p>
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary transition-colors cursor-pointer">
+                        {product.name}
+                      </h3>
+                      <div className="flex items-center gap-1 mb-3">
+                        {[...Array(5)].map((_, i) => (
+                          <span
+                            key={i}
+                            className={`material-symbols-outlined text-[16px] ${
+                              i < 4
+                                ? "text-yellow-400 fill-current"
+                                : "text-slate-300"
+                            }`}
+                          >
+                            <FaStar />
                           </span>
+                        ))}
+                        <span className="text-xs text-slate-400 ml-1">(0)</span>
+                      </div>
+                      <div className="mt-auto flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-lg text-primary">
+                            ${product.price?.toFixed(2) || "0.00"}
+                          </span>
+                          {product.offer && (
+                            <span className="text-sm text-slate-400 line-through">
+                              $
+                              {(
+                                product.price /
+                                (1 - product.offer / 100)
+                              ).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                        {outOfStock && (
+                          <span className="text-xs font-semibold text-red-600">Out of stock</span>
                         )}
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             ) : (
               <div className="col-span-full text-center py-12">
                 <p className="text-slate-500 dark:text-slate-400">
@@ -566,7 +679,90 @@ function ProductListPage() {
           />
         </div>
       </div>
-    </main>
+      <LoginSignupModal 
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={(role) => {
+          setIsLoginModalOpen(false);
+          navigate(role === 'admin' ? '/admin' : '/user');
+        }}
+      />
+
+      {isQuantityModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={closeQuantityModal}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-slate-500">{modalAction === 'cart' ? 'Add to Cart' : 'Buy Now'}</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {selectedProduct?.name}
+                </h3>
+              </div>
+              <button
+                className="text-slate-400 hover:text-slate-600"
+                onClick={closeQuantityModal}
+                aria-label="Close quantity modal"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Quantity</span>
+              <div className="flex items-center border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800">
+                <button
+                  className="px-3 py-2 text-slate-600 hover:text-slate-900"
+                  onClick={() => setModalQuantity((q) => Math.max(1, q - 1))}
+                  type="button"
+                >
+                  -
+                </button>
+                <input
+                  className="w-16 text-center border-0 bg-transparent focus:ring-0 text-slate-900 dark:text-white"
+                  type="number"
+                  min={1}
+                  value={modalQuantity}
+                  onChange={(e) => setModalQuantity(Math.max(1, Number(e.target.value) || 1))}
+                />
+                <button
+                  className="px-3 py-2 text-slate-600 hover:text-slate-900"
+                  onClick={() => setModalQuantity((q) => q + 1)}
+                  type="button"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {(actionError || actionMessage) && (
+              <p className={`text-sm ${actionError ? 'text-red-600' : 'text-green-600'}`}>
+                {actionError || actionMessage}
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                onClick={closeQuantityModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-primary text-white font-semibold py-3 rounded-xl hover:bg-blue-600 transition-colors"
+                onClick={handleConfirmQuantity}
+              >
+                {modalAction === 'cart' ? 'Add to Cart' : 'Proceed to Checkout'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}    </main>
   );
 }
 
